@@ -1,0 +1,48 @@
+name: Run Custom Proxy Server
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Install and Start Xray + Cloudflare Tunnel
+        run: |
+          mkdir -p /tmp/xray
+          curl -L -o /tmp/xray/xray.zip https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
+          unzip /tmp/xray/xray.zip -d /tmp/xray/
+          
+          cat << EOF > /tmp/xray/config.json
+          {
+            "log": { "loglevel": "warning" },
+            "inbounds": [
+              {
+                "port": 8080,
+                "protocol": "vless",
+                "settings": {
+                  "clients": [
+                    { "id": "b831381d-6324-4d53-ad4f-8cda48b30811" }
+                  ],
+                  "decryption": "none"
+                },
+                "streamSettings": { "network": "tcp" }
+              }
+            ],
+            "outbounds": [
+              { "protocol": "freedom" }
+            ]
+          }
+          EOF
+
+          /tmp/xray/xray run -config /tmp/xray/config.json &
+
+          curl -L --output /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x /tmp/cloudflared
+          
+          /tmp/cloudflared tunnel --url http://localhost:8080
+          
